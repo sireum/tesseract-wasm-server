@@ -1,0 +1,96 @@
+name: Build
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, '[release]')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read versions
+        id: versions
+        run: |
+          get_prop() { grep "^$1=" versions.properties | cut -d= -f2; }
+          echo "tesseract=$(get_prop tesseract.version)" >> "$GITHUB_OUTPUT"
+
+      - name: Install Emscripten SDK
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+
+      - name: Install Binaryen
+        run: |
+          BINARYEN_URL=$(curl -s https://api.github.com/repos/WebAssembly/binaryen/releases/latest \
+            | grep -o '"browser_download_url": *"[^"]*x86_64-linux.tar.gz"' \
+            | head -1 | cut -d'"' -f4)
+          curl -LO "$BINARYEN_URL"
+          tar xzf binaryen-*-x86_64-linux.tar.gz
+          sudo cp binaryen-*/bin/* /usr/local/bin/
+
+      - name: Install WABT
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q wabt
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Install wasmtime
+        uses: bytecodealliance/actions/wasmtime/setup@v1
+
+      - name: Install Scala CLI
+        uses: VirtusLab/scala-cli-setup@v1
+
+      - name: Test wasmtime variant
+        run: scala-cli run test_server.sc -- tesseract_server_graal.wasm
+
+      - name: Test GraalVM variant
+        run: scala-cli run test_server.sc -- tesseract_server_graal.wasm --graalvm
+
+      - name: Upload WASM
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_name: sireum/rolling
+          repo_token: ${{ secrets.RELEASE_TOKEN }}
+          file: tesseract_server_graal.wasm
+          asset_name: tesseract-server-${{ steps.versions.outputs.tesseract }}.wasm
+          tag: misc
+          overwrite: true
+
+      - name: Upload Tesseract License
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_name: sireum/rolling
+          repo_token: ${{ secrets.RELEASE_TOKEN }}
+          file: tesseract/LICENSE
+          asset_name: tesseract-server-${{ steps.versions.outputs.tesseract }}-license.txt
+          tag: misc
+          overwrite: true
+
+      - name: Upload Leptonica License
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_name: sireum/rolling
+          repo_token: ${{ secrets.RELEASE_TOKEN }}
+          file: leptonica/leptonica-license.txt
+          asset_name: leptonica-license.txt
+          tag: misc
+          overwrite: true
+
+      - name: Upload Wrapper License
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_name: sireum/rolling
+          repo_token: ${{ secrets.RELEASE_TOKEN }}
+          file: license.txt
+          asset_name: tesseract-wasm-server-license.txt
+          tag: misc
+          overwrite: true

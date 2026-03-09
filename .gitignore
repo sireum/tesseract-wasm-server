@@ -1,0 +1,13 @@
+*.wasm
+eng_traineddata.h
+.bsp
+.scala-build
+zlib/
+zlib-wasm-install/
+libpng/
+libpng-wasm-install/
+leptonica/
+leptonica-wasm-install/
+tesseract/
+tesseract-wasm-install/
+tessdata/
