@@ -27,13 +27,9 @@ if [ ! -d "$ZLIB_INSTALL" ]; then
   if [ ! -d zlib ]; then
     git clone --depth 1 --branch "v$ZLIB_V" https://github.com/madler/zlib.git
   fi
-  mkdir -p zlib/build-wasm
-  cd zlib/build-wasm
-  emcmake cmake .. \
-    -DCMAKE_INSTALL_PREFIX="$ZLIB_INSTALL" \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_SHARED_LIBS=OFF \
-    -DCMAKE_C_FLAGS="-fwasm-exceptions -pthread"
+  cd zlib
+  CFLAGS="-fwasm-exceptions -pthread" emconfigure ./configure \
+    --prefix="$ZLIB_INSTALL" --static
   emmake make -j"$NPROC"
   emmake make install
   cd "$SCRIPT_DIR"
